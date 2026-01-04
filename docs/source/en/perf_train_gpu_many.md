@@ -93,6 +93,78 @@ Tensor parallelism is effective for training large models that don't fit into th
 
 Refer to the [Tensor parallelism](./perf_infer_gpu_multi) guide to learn how to use it for inference.
 
+### Tensor Parallelism with Trainer (TP-only)
+
+Tensor Parallelism (TP) can also be used during **training** with the `Trainer` API. However, because TP is often demonstrated together with other strategies (such as data parallelism, pipeline parallelism, or FSDP), it can be difficult to understand how to enable **TP-only training** in isolation.
+
+This section provides a concise overview of how Tensor Parallelism fits into the `Trainer` workflow, focusing on the minimal configuration needed to enable TP without combining it with other parallelism strategies.
+
+#### Key components involved
+
+Using Tensor Parallelism with `Trainer` relies on three main components:
+
+- **`device_mesh`**  
+  Defines the set of devices that participate in tensor parallelism. For TP-only training, this is typically a 1D mesh spanning multiple GPUs on a single node.
+
+- **`tp_plan`**  
+  Specifies how individual tensors inside model layers (for example, linear projection weights) are partitioned across the tensor-parallel devices. This is passed when initializing the model.
+
+- **`parallelism_config` (in `TrainingArguments`)**  
+  Informs the `Trainer` which parallelism strategies to enable. When configured for TP-only training, this enables tensor parallelism without activating FSDP or other strategies.
+
+In practice:
+- `device_mesh` determines **which devices participate**
+- `tp_plan` determines **what tensors are split**
+- `parallelism_config` determines **how the Trainer applies tensor parallelism**
+
+#### How TP-only training fits into `Trainer`
+
+In a TP-only setup:
+
+1. The model is initialized with a tensor parallel plan and a device mesh.
+2. `TrainingArguments` are configured with a tensor-parallel-only `parallelism_config`.
+3. The `Trainer` API itself remains unchanged.
+4. Tensor parallel communication and synchronization are handled internally during the forward and backward passes.
+
+This allows Tensor Parallelism to be enabled while keeping the standard `Trainer` training loop intact.
+
+#### Minimal TP-only configuration (illustrative)
+
+The example below illustrates the **configuration flow** required for TP-only training with `Trainer`. It is intentionally minimal and focuses on how the components are connected, rather than on full training details.
+
+```python
+# Illustrative example (simplified)
+
+# 1. Define the device mesh for tensor parallelism
+device_mesh = ...
+
+# 2. Load the model with a tensor parallel plan
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    tp_plan=...,
+    device_mesh=device_mesh,
+)
+
+# 3. Configure TrainingArguments with TP-only parallelism
+training_args = TrainingArguments(
+    output_dir="...",
+    parallelism_config={
+        "tensor_parallel": {
+            "enabled": True,
+        }
+    },
+)
+
+# 4. Use Trainer as usual
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=...,
+)
+
+trainer.train()
+```
+
 ## Hybrid parallelism
 
 Parallelism methods can be combined to achieve even greater memory savings and more efficiently train models with billions of parameters.
