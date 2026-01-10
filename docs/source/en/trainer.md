@@ -386,6 +386,37 @@ training_args = TrainingArguments(
 )
 ```
 
+## Tensor Parallelism
+
+Tensor parallelism enables a model's weights to be partitioned across multiple GPUs, allowing training to scale when a single device does not have enough memory to hold the entire model.
+
+To enable tensor parallelism with `Trainer`, simply pass `tp_plan="auto"` to `from_pretrained()`. Trainer and Accelerate will automatically detect the available devices, create the appropriate tensor parallel mesh, and shard the model across GPUs.
+
+```python
+from transformers import AutoModelForCausalLM, Trainer, TrainingArguments
+
+model = AutoModelForCausalLM.from_pretrained(
+    "gpt2",            # replace with any causal LM model
+    tp_plan="auto",    # enable Tensor Parallelism
+)
+
+training_args = TrainingArguments(
+    output_dir="tp-output",
+    per_device_train_batch_size=1,
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+)
+
+trainer.train()
+```
+
+For more details on tensor parallelism concepts and how it interacts with other distributed strategies, see the full guide [here](https://huggingface.co/docs/transformers/perf_infer_gpu_multi).
+
+
 ### GaLore
 
 [Gradient Low-Rank Projection (GaLore)](https://hf.co/papers/2403.03507) significantly reduces memory usage when training large language models (LLMs). One of GaLores key benefits is *full-parameter* learning, unlike low-rank adaptation methods like [LoRA](https://hf.co/papers/2106.09685), which produces better model performance.
